@@ -8,6 +8,8 @@ function _init()
  dirx={-1,1,0,0,1,1,-1,-1}
  diry={0,0,-1,1,-1,1,1,-1}
  
+ mob_ani={240, 192}
+ 
  _upd = update_game
  _drw = draw_game
  startgame()
@@ -26,16 +28,12 @@ end
 function startgame()
  buttbuff=-1
  
- p_x = 3
- p_y = 4
- p_ox=0
- p_oy=0
- p_sox=0
- p_soy=0
- p_flip=false
- p_mov=nil
- p_t=0
+ mob={}
+ p_mob=addmob(1,3,4)
+ addmob(2,9,5)
  
+ p_t=0
+
  wind={}
  talkwind=nil
 end
@@ -43,7 +41,7 @@ end
 -->8
 --updates
 function update_game()
- if talkwind != nil then
+ if talkwind then
   if getbutt()==5 then
    talkwind.dur=0
    talkwind=nil
@@ -59,7 +57,7 @@ function update_pturn()
  dobuttbuff()
  p_t=min(p_t+0.2,1)
  
- p_mov()
+ p_mob.mov(p_mob,p_t)
  
  if p_t == 1 then
   _upd=update_game
@@ -70,18 +68,19 @@ function update_gameover()
 
 end
 
-function mov_walk()
- p_ox=p_sox*(1-p_t)
- p_oy=p_soy*(1-p_t)
+function mov_walk(mob,at)
+ mob.ox=mob.sox*(1-at)
+ mob.oy=mob.soy*(1-at)
 end
 
-function mov_bump()
- local tme=p_t
- if p_t>0.5 then
-  tme=1-p_t
+function mov_bump(mob,at)
+ --★
+ local tme=at
+ if at>0.5 then
+  tme=1-at
  end
- p_ox=p_sox*tme
- p_oy=p_soy*tme
+ mob.ox=mob.sox*tme
+ mob.oy=mob.soy*tme
 end
 
 function dobuttbuff()
@@ -103,7 +102,6 @@ function dobutt(butt)
  if butt<0 then return end
  if butt<4 then
   moveplayer(dirx[butt+1],diry[butt+1])
-  return
  end
  -- menu button
 end
@@ -114,7 +112,10 @@ function draw_game()
  map()
  
 -- drawspr(getframe(p_ani),p_x*8,p_y*8,9)
- drawspr(getframe(p_ani),p_x*8+p_ox,p_y*8+p_oy,10,p_flip)
+-- drawspr(getframe(p_ani),p_x*8+p_ox,p_y*8+p_oy,10,p_flip)
+ for m in all(mob) do
+  drawspr(getframe(m.ani),m.x*8+m.ox,m.y*8+m.oy,10,m.flp)
+ end
 end
 
 function draw_gameover()
@@ -148,36 +149,42 @@ end
 --grameplay
 
 function moveplayer(dx,dy)
- local destx,desty=p_x+dx,p_y+dy
+ local destx,desty=p_mob.x+dx,p_mob.y+dy
  local tle=mget(destx,desty)
  
  
 	if dx<0 then
-	 p_flip=true
+	 p_mob.flp=true
 	elseif dx>0 then
-		p_flip=false
+		p_mob.flp=false
 	end
 	 
- if fget(tle,0) then
-  --wall
-	 p_sox,p_soy=dx*8,dy*8
-	 p_ox,p_oy=0,0
-	 p_t=0
-	 _upd=update_pturn
-	 p_mov=mov_bump
-	 if fget(tle,1)then
-	  trig_bump(tle,destx,desty)
-		end
- else
+ if iswalkable(destx,desty,"checkmobs") then
   sfx(63)
-	 p_x+=dx
-	 p_y+=dy
+	 p_mob.x+=dx
+	 p_mob.y+=dy
 	
-	 p_sox,p_soy=-dx*8,-dy*8
-	 p_ox,p_oy=p_sox,p_soy
+	 p_mob.sox,p_mob.soy=-dx*8,-dy*8
+	 p_mob.ox,p_mob.oy=p_mob.sox,p_mob.soy
 	 p_t=0
 	 _upd=update_pturn
-	 p_mov=mov_walk
+	 p_mob.mov=mov_walk
+ else
+  --not walkable
+	 p_mob.sox,p_mob.soy=dx*8,dy*8
+	 p_mob.ox,p_mob.oy=0,0
+	 p_t=0
+	 _upd=update_pturn
+	 p_mob.mov=mov_bump
+	 
+	 local mob=getmob(destx,desty)
+	 if mob==false then
+	  if fget(tle,1)then
+	   trig_bump(tle,destx,desty)
+		 end
+		else
+		 hitmob(p_mob,mob)
+	 end
  end
  
 end
@@ -204,6 +211,36 @@ function trig_bump(tle,destx,desty)
 
 end
 
+function getmob(x,y)
+ for m in all(mob) do
+  if m.x==x and m.y==y then
+   return m
+  end
+ end
+ return false
+end
+
+function iswalkable(x,y,mode)
+ if mode== nil then mode="" end
+ if inbounds(x,y) then
+  local tle=mget(x,y)
+  if fget(tle,0)==false then
+   if mode=="checkmobs" then
+    return getmob(x,y)==false
+   end
+   return true
+  end
+ end
+ return false
+end
+
+function inbounds(x,y)
+ return not (x<0 or y<0 or x>15 or y>15)
+end
+
+function hitmob(atkm,defm)
+ 
+end
 -->8
 --ui
 
@@ -217,8 +254,7 @@ function drawind()
  for w in all(wind) do
   local wx,wy,ww,wh=w.x,w.y,w.w,w.h
   rectfill2(wx,wy,ww,wh,0)
-  rectfill2(wx+1,wy+1,ww-2,wh-2,6)
-  rectfill2(wx+2,wy+2,ww-4,wh-4,0)
+  rect(wx+1,wy+1,wx+ww-2,wy+wh-2,6)
   wx+=4
   wy+=4
   clip(wx,wy,ww-8,wh-8)
@@ -258,6 +294,28 @@ end
 function showmsg(txt)
  talkwind=addwind(16,50,94,#txt*6+7,txt)
  talkwind.butt=true
+end
+
+-->8
+--mobs
+
+function addmob(typ,mx,my)
+ local m={
+  x=mx,
+  y=my,
+  ox=0,
+  oy=0,
+  sox=0,
+  soy=0,
+  flp=false,
+  mov=nil,
+  ani={}
+ }
+ for i=0,3 do
+  add(m.ani,mob_ani[typ]+i)
+ end
+ add(mob,m)
+ return m
 end
 
 __gfx__
@@ -398,8 +456,10 @@ __map__
 0000000000000002020202000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000020202020208060c02020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000020f0101010101010e020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000020202020202020102020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000020d02000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000020202010102020102020202020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000002010101020d02010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000002010101010101010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000002010101010101010101020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __sfx__
 0001000003050080500c050110500e050120501a050190502001022010230102d020260202e0502602026020230501c020250202602024020200201f0201d0201c02017030190501805017050160501505013050
 010100001272017720117100170001700017000170001700007000170001700017000070000700007000070000700007000070000700007000070000700007000070000700007000070000700000000000000000
