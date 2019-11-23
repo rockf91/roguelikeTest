@@ -12,6 +12,8 @@ function _init()
  mob_atk={1, 1}
  mob_hp={5, 2}
  
+ debug={}
+ 
  _upd = update_game
  _drw = draw_game
  startgame()
@@ -26,6 +28,11 @@ end
 function _draw()
  _drw()
  drawind()
+ cursor(4,4)
+ color(8)
+ for txt in all(debug) do
+  print(txt)
+ end
 end
 
 function startgame()
@@ -82,10 +89,8 @@ function update_aiturn()
  p_t=min(p_t+0.125,1)
  
  for m in all(mob) do
-  if m!=p_mob then
-   if m.mov then
+  if m!=p_mob and m.mov then
     m.mov(m,p_t)
-   end
   end
  end
  if p_t == 1 then
@@ -398,19 +403,33 @@ function mov_bump(mob,at)
 end
 
 function doai()
+ --debug={}
  for m in all(mob) do
   if m!=p_mob then
-   local bdst,bx,by=999,0,0
-   for i=1,4 do
-    local dx,dy=dirx[i],diry[i]
-    local dst=dist(m.x+dx,m.y+dy,p_mob.x,p_mob.y)
-    if dst<bdst then
-     bdst,bx,by=dst,dx,dy
-    end 
+   m.mov=nil
+   if dist(m.x,m.y,p_mob.x,p_mob.y)==1 then 
+     --attack player
+     dx,dy=p_mob.x-m.x,p_mob.y-m.y
+     mobbump(m,dx,dy)
+     hitmob(m,p_mob)
+     sfx(57)
+   else
+     --move to player
+    local bdst,bx,by=999,0,0
+    for i=1,4 do
+     local dx,dy=dirx[i],diry[i]
+     local tx,ty=m.x+dx,m.y+dy
+     if iswalkable(tx,ty,"checkmobs") then
+      local dst=dist(tx,ty,p_mob.x,p_mob.y)
+      if dst<bdst then
+       bdst,bx,by=dst,dx,dy
+      end
+     end 
+    end
+    mobwalk(m,bx,by)
+    _upd=update_aiturn
+    p_t=0
    end
-   mobwalk(m,bx,by)
-   _upd=update_aiturn
-   p_t=0
   end
  end
 end
