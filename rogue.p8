@@ -311,11 +311,15 @@ function iswalkable(x,y,mode)
  if mode== nil then mode="" end
  if inbounds(x,y) then
   local tle=mget(x,y)
-  if fget(tle,0)==false then
-   if mode=="checkmobs" then
-    return getmob(x,y)==false
+  if mode=="sight" then
+   return not fget(tle,2)
+  else
+   if fget(tle,0)==false then
+    if mode=="checkmobs" then
+     return getmob(x,y)==false
+    end
+    return true
    end
-   return true
   end
  end
  return false
@@ -350,6 +354,38 @@ function checkend()
  return true
 end
 
+--line of side
+function los(x1,y1,x2,y2)
+ local frst,sx,sy,dx,dy=true
+ --★
+ if dist(x1,y1,x2,y2)==1 then return true end
+ if y1>y2 then
+  x1,x2,y1,y2=x2,x1,y2,y1
+ end
+ sy,dy=1,y2-y1
+
+ if x1<x2 then
+  sx,dx=1,x2-x1
+ else
+  sx,dx=-1,x1-x2
+ end
+ 
+ local err,e2=dx-dy
+ 
+ while not(x1==x2 and y1==y2) do
+  if not frst and iswalkable(x1,y1,"sight")==false then return false end
+  e2,frst=err+err,false
+  if e2>-dy then
+   err-=dy
+   x1+=sx
+  end
+  if e2<dx then 
+   err+=dx
+   y1+=sy
+  end
+ end
+ return true 
+end
 -->8
 --ui
 
